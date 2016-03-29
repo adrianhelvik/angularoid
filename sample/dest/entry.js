@@ -1,0 +1,1 @@
+module.exports = [require('./articles.service.js'), require('./front-page.controller.js'), require('./login.controller.js')];
