@@ -22,3 +22,12 @@ Usage
 
 angularoid --source [source folder] --dest [destination folder] --entry [entry file for including]
 in your app.
+
+Features
+--------
+
+* No more angular.module boilerplate when you already have a module system.
+* Dependency injection is made minification safe.
+* No need to require all files manually.
+* Simplified testing with CommonJS modules.
+* Angular is automatically required at the beginning of the sourced files.

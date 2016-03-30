@@ -5,18 +5,27 @@ var fileNameToCamelCase = require('./fileNameToCamelCase').capitalized;
 var getAngularFiletype = require('./getAngularFiletype');
 var path = require('path');
 var mkdirp = require('mkdirp');
+var injectAngularDeps = require('./injectAngularDeps');
+var chalk = require('chalk');
 
 var argv = require('yargs')
-    .usage('Usage: --source=[source folder] --dest=[destination folder] --entry=[entry file to be created] --module=[name of the angular module to be used]')
+    .usage('Usage: --source=[source folder] --dest=[destination folder] --entry=[entry file to be created] --module=[name of the angular module to be used] --verbose')
     .demand(['source', 'dest', 'entry', 'module'])
     .default('entry', '[dest/]entry.js')
     .default('module', 'app')
     .argv;
 
+var debug = {
+    log: ! argv.verbose ? function() {} : function (value) {
+    console.log( chalk.yellow('[verbose]: ' + [].reduce.call(arguments, (a, b) => a + '\n' + b ) ) );
+} };
+
 if (argv.entry === '[dest/]entry.js')
     argv.entry = stripTrailing(argv.dest, '/') + '/entry.js';
 
-console.log('Writing entry file to:', argv.entry);
+argv.entry = path.resolve(argv.entry);
+
+debug.log('Writing entry file to:', argv.entry);
 
 parseFiles(argv, (err) => {
     if (err)
@@ -25,6 +34,10 @@ parseFiles(argv, (err) => {
 
 function parseFiles(argv, cb) {
     glob(argv.source + `/**/*.*.js`, (err, files) => {
+        files = files.filter( file => file.split('.').filter(item => item).length >= 3 );
+
+        debug.log( 'Files:\n  ' + files.join('\n  ') );
+
         if (err) {
             console.log(err);
             process.exit(1);
@@ -45,7 +58,10 @@ function getDest(argv, file) {
 }
 
 function store(destination, result) {
-    fs.writeFile(destination, result);
+    fs.writeFile(destination, result, (err) => {
+        if (err)
+            console.log('Could not store file to ' + destination + '\n', err);
+    });
 }
 
 function createEntry(error, files, argv, cb) {
@@ -53,15 +69,15 @@ function createEntry(error, files, argv, cb) {
         if (error)
             return console.log('Could not create entry', error);
 
-        var content = 'module.exports = [';
+        var content = 'module.exports = [\n';
 
         files.forEach(file => {
             var relativePath = path.relative(argv.entry + '/..', getDest(argv, file));
 
-            content += `require('./${relativePath}'), `
+            content += `    require('./${relativePath}'),\n`
         });
 
-        content = stripTrailing( content.trim(), ',' ) + '];';
+        content = stripTrailing( content.trim(), ',' ) + '\n];';
 
         cb && cb(null, argv.entry, content);
     });
@@ -87,16 +103,25 @@ function parseFile(file) {
     var name = fileNameToCamelCase(argv.source, file);
 
     fs.readFile(file, (err, data) => {
-        var result =
-`;
-if (typeof angular == 'undefined')
+        if (err)
+            return console.log(err);
+
+        injectAngularDeps(null, data, (err, data) => {
+            if (err)
+                return console.log('Could not inject angular dependencies');
+
+            var result =
+`;(function() {
+if (typeof module == 'undefined')
+    var module = {};
+if (typeof angular == 'undefined' && typeof require != 'undefined')
     var angular = require('angular');
-
-${data.toString()};
-
-angular.module("${argv.module}").${type}('${name}', module.exports);`;
+${data.toString()}
+;angular.module('${argv.module}').${type}('${name}', module.exports);
+})();`;
 
             store(getDest(argv, file), result);
+        });
     });
 }
 
