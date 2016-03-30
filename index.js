@@ -1,3 +1,5 @@
+#!usr/local/bin/node
+
 var assert = require('assert');
 var fs = require('fs');
 var glob = require('glob');
