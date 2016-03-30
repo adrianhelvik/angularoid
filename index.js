@@ -1,4 +1,4 @@
-#!/usr/local/bin/env node
+#!/usr/bin/env node
 
 var assert = require('assert');
 var fs = require('fs');
